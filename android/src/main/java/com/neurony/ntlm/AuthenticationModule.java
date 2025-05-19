@@ -23,8 +23,10 @@ import com.ReactJsonConvert;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.Interceptor;
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 
@@ -47,6 +49,7 @@ public class AuthenticationModule extends ReactContextBaseJavaModule
     @ReactMethod
     public void login(String url, String username, String password,
                       final ReadableMap headers,
+                      final ReadableMap body,
                       final Promise onResult)
     {
         final Authenticator authenticator=new Authenticator(username, password);
@@ -92,7 +95,24 @@ public class AuthenticationModule extends ReactContextBaseJavaModule
 
         OkHttpClient client=clientBuilder.build();
 
-        client.newCall(new Request.Builder().get().url(url).build())
+        // -- Build JSON Body for POST ---
+
+        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+        String jsonBody = "";
+        if(body != null && body.toHashMap().size() > 0){
+            try {
+                jsonBody = new JSONObject(body.toHashMap()).toString();
+            } catch (Exception e){
+                jsonBody = "";
+            }
+        }
+
+        RequestBody requestBody = RequestBody.create(JSON,jsonBody);
+        Request.Builder requestBuilder = new Request.Builder()
+                         .url(url)
+                         .post(requestBody); // <-- Use POST with JSON body         
+
+        client.newCall(requestBuilder.build())
             .enqueue(new Callback()
             {
                 @Override
@@ -125,12 +145,24 @@ public class AuthenticationModule extends ReactContextBaseJavaModule
 
                         WritableMap loginResult=new WritableNativeMap();
                         loginResult.putMap("headers", headers);
+                        loginResult.putInt("status", response.code);
+
+                        ReesponseBody body = response.body();
+                        String bodyString = (body != null) ? body.string() : "";
+                        String contentType = response.header("Content-Type","");
+
 
                         try
                         {
-                            ResponseBody body=response.body();
-                            JSONObject bodyJson=body!=null?new JSONObject(body.string()):new JSONObject();
-                            loginResult.putMap("body", ReactJsonConvert.jsonToReact(bodyJson));
+                            if(bodyString != null && !bodyString.trim().isEmpty() && contentType.contains("application/json")){
+                                JSONObject bodyJson = new JSONObject(bodyString);
+                                loginResult.putMap("body", ReactJsonConvert.jsonToReact(bodyJson));
+                            } else if(bodyString != null && !bodyString.trim().isEmpty()){
+                                loginResult.putString("body", bodyString);
+                            } else {
+                                 loginResult.putMap("body", new WritableNativeMap());
+                            }
+                            
                             onResult.resolve(loginResult);
                         }
                         catch (JSONException ex)
