@@ -145,9 +145,9 @@ public class AuthenticationModule extends ReactContextBaseJavaModule
 
                         WritableMap loginResult=new WritableNativeMap();
                         loginResult.putMap("headers", headers);
-                        loginResult.putInt("status", response.code());
+                        loginResult.putInt("status",  .code());
 
-                        ReesponseBody body = response.body();
+                        ResponseBody body = response.body();
                         String bodyString = (body != null) ? body.string() : "";
                         String contentType = response.header("Content-Type","");
 
